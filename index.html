@@ -55,11 +55,6 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 .capture-thumb:hover .remove-btn{opacity:1}
 .capture-empty{width:120px;height:80px;border-radius:6px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.75rem;text-align:center;padding:.5rem}
 
-/* Sliders */
-.slider-group{margin-bottom:.75rem}
-.slider-group label{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted);font-weight:600;margin-bottom:.25rem}
-.slider-group input[type="range"]{width:100%;accent-color:var(--primary);background:transparent}
-
 /* Improvement Ideas */
 .idea-card{padding:.6rem .75rem;border:1px solid var(--border);border-radius:6px;margin-bottom:.5rem;cursor:pointer;transition:background .2s,border-color .2s;font-size:.85rem}
 .idea-card:hover{background:#f5f3ed}
@@ -159,25 +154,6 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
         <span class="step-badge">1</span> Load Street View
       </button>
 
-      <div id="angleControls" style="margin-top:1rem;display:none">
-        <h2 style="font-size:.85rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:.5rem">Adjust Angle</h2>
-        <div class="slider-group">
-          <label>Heading <strong id="headingVal">0°</strong></label>
-          <input type="range" id="headingSlider" min="0" max="360" value="0" oninput="onSliderChange()">
-        </div>
-        <div class="slider-group">
-          <label>Pitch <strong id="pitchVal">0°</strong></label>
-          <input type="range" id="pitchSlider" min="-45" max="45" value="0" oninput="onSliderChange()">
-        </div>
-        <div class="slider-group">
-          <label>Zoom <strong id="zoomVal">1</strong></label>
-          <input type="range" id="zoomSlider" min="0" max="4" step="0.5" value="1" oninput="onSliderChange()">
-        </div>
-        <button class="btn btn-secondary" onclick="captureAngle()" style="margin-top:.5rem">
-          📸 Capture This Angle
-        </button>
-      </div>
-
       <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeAndSuggest()" disabled style="margin-top:.75rem">
         <span class="step-badge">2</span> AI Analysis &amp; Ideas
       </button>
@@ -207,6 +183,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
         <span>Zoom: <strong id="povZoom">1x</strong></span>
         <span>Status: <strong id="povStatus">Drag to adjust</strong></span>
       </div>
+      <button class="btn btn-secondary" id="captureBtn" onclick="captureAngle()" style="margin-top:.75rem;display:none">
+        📸 Capture This Angle
+      </button>
       <div class="captures-strip" id="capturesStrip">
         <!-- Captured angle thumbnails appear here -->
       </div>
@@ -240,7 +219,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
     <div class="card" style="margin-top:1.25rem">
       <h2>Final Prompt</h2>
       <p style="font-size:.82rem;color:var(--muted);margin-bottom:.5rem">Instructions for Nano Banana 2 image model</p>
-      <textarea id="promptArea" rows="6" placeholder="Select ideas above to auto-build the prompt, or type your own..."></textarea>
+      <textarea id="promptArea" rows="6" placeholder="Type your own makeover instructions, or run AI Analysis to auto-generate a prompt. All captured angles will be sent to the model."></textarea>
     </div>
   </div>
 
@@ -291,7 +270,7 @@ function updateKeyStatus() {
 function loadMapsAPI() {
   if (mapsReady) return;
   const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&libraries=geometry&callback=onMapsReady`;
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&callback=onMapsReady`;
   script.async = true;
   script.defer = true;
   script.onerror = () => showStatus('svStatus', 'Failed to load Google Maps API. Check your Maps key.', 'error');
@@ -328,8 +307,6 @@ async function loadStreetView() {
       throw new Error(`No Street View imagery found for this address (${meta.status})`);
     }
 
-    const svLat = meta.location.lat;
-    const svLng = meta.location.lng;
     const panoId = meta.pano_id;
 
     // Wait for Maps API if needed
@@ -338,40 +315,18 @@ async function loadStreetView() {
       await new Promise(r => { const check = setInterval(() => { if (mapsReady) { clearInterval(check); r(); }}, 200); });
     }
 
-    // Geocode the address to get the actual house location
-    let initHeading = 0;
-    try {
-      const geocoder = new google.maps.Geocoder();
-      const geoResult = await new Promise((resolve, reject) => {
-        geocoder.geocode({ address }, (results, status) => {
-          if (status === 'OK' && results[0]) resolve(results[0]);
-          else reject(new Error(status));
-        });
-      });
-      const houseLat = geoResult.geometry.location.lat();
-      const houseLng = geoResult.geometry.location.lng();
-      // Calculate heading from Street View camera to the house
-      initHeading = google.maps.geometry.spherical.computeHeading(
-        new google.maps.LatLng(svLat, svLng),
-        new google.maps.LatLng(houseLat, houseLng)
-      );
-    } catch (e) {
-      // If geocoding fails, default to 0
-      console.warn('Geocode failed, using default heading:', e);
-    }
-
     // Clear placeholder and init panorama
     document.getElementById('svPlaceholder')?.remove();
 
     if (panorama) {
       panorama.setPano(panoId);
-      panorama.setPov({ heading: initHeading, pitch: 0 });
+      panorama.setPov({ heading: 0, pitch: 0 });
       panorama.setZoom(1);
     } else {
       panorama = new google.maps.StreetViewPanorama(
         document.getElementById('sv-panorama'), {
           pano: panoId,
-          pov: { heading: initHeading, pitch: 0 },
+          pov: { heading: 0, pitch: 0 },
           zoom: 1,
           addressControl: false,
           showRoadLabels: false,
@@ -382,26 +337,24 @@ async function loadStreetView() {
         }
       );
 
-      // Sync sliders with panorama movement
-      panorama.addListener('pov_changed', syncSlidersFromPanorama);
-      panorama.addListener('zoom_changed', syncSlidersFromPanorama);
+      // Update POV readout when user drags
+      panorama.addListener('pov_changed', updatePovReadout);
+      panorama.addListener('zoom_changed', updatePovReadout);
     }
 
-    // Show angle controls + readout
-    document.getElementById('angleControls').style.display = 'block';
+    // Show readout + capture button
     document.getElementById('povReadout').style.display = 'flex';
-    document.getElementById('headingSlider').value = Math.round((initHeading + 360) % 360);
-    document.getElementById('pitchSlider').value = 0;
-    document.getElementById('zoomSlider').value = 1;
-    syncSliderLabels(initHeading, 0, 1);
+    document.getElementById('captureBtn').style.display = 'flex';
+    updatePovReadout();
 
     // Clear old captures
     captures = [];
     selectedCapture = -1;
     renderCaptureStrip();
 
-    // Enable analyze button if we have captures
+    // Disable until user captures an angle
     document.getElementById('analyzeBtn').disabled = true;
+    document.getElementById('renderBtn').disabled = true;
 
     showStatus('svStatus', `Street View loaded! Drag to look around, then click "Capture This Angle" when you find a good view.`, 'success');
   } catch (err) {
@@ -412,33 +365,13 @@ async function loadStreetView() {
   }
 }
 
-function syncSlidersFromPanorama() {
+function updatePovReadout() {
   if (!panorama) return;
   const pov = panorama.getPov();
   const zoom = panorama.getZoom();
-  document.getElementById('headingSlider').value = Math.round(pov.heading + 360) % 360;
-  document.getElementById('pitchSlider').value = Math.round(pov.pitch);
-  document.getElementById('zoomSlider').value = zoom;
-  syncSliderLabels(pov.heading, pov.pitch, zoom);
-}
-
-function syncSliderLabels(h, p, z) {
-  document.getElementById('headingVal').textContent = `${Math.round((h + 360) % 360)}°`;
-  document.getElementById('pitchVal').textContent = `${Math.round(p)}°`;
-  document.getElementById('zoomVal').textContent = `${z.toFixed(1)}x`;
-  document.getElementById('povHeading').textContent = `${Math.round((h + 360) % 360)}°`;
-  document.getElementById('povPitch').textContent = `${Math.round(p)}°`;
-  document.getElementById('povZoom').textContent = `${z.toFixed(1)}x`;
-}
-
-function onSliderChange() {
-  if (!panorama) return;
-  const h = parseFloat(document.getElementById('headingSlider').value);
-  const p = parseFloat(document.getElementById('pitchSlider').value);
-  const z = parseFloat(document.getElementById('zoomSlider').value);
-  panorama.setPov({ heading: h, pitch: p });
-  panorama.setZoom(z);
-  syncSliderLabels(h, p, z);
+  document.getElementById('povHeading').textContent = `${Math.round((pov.heading + 360) % 360)}°`;
+  document.getElementById('povPitch').textContent = `${Math.round(pov.pitch)}°`;
+  document.getElementById('povZoom').textContent = `${zoom.toFixed(1)}x`;
 }
 
 // ── Capture Angle ───────────────────────────────────────────
@@ -470,7 +403,8 @@ async function captureAngle() {
     selectedCapture = captures.length - 1;
     renderCaptureStrip();
     document.getElementById('analyzeBtn').disabled = false;
-    showStatus('svStatus', `Angle captured! (${heading}° heading, ${pitch}° pitch). Capture more angles or proceed to AI Analysis.`, 'success');
+    document.getElementById('renderBtn').disabled = false;
+    showStatus('svStatus', `Angle captured! (${heading}° heading, ${pitch}° pitch). Capture more angles, run AI Analysis, or type your own prompt and Render.`, 'success');
   } catch (err) {
     showStatus('svStatus', `Capture failed: ${err.message}`, 'error');
   }
@@ -504,33 +438,31 @@ function removeCapture(i) {
   if (selectedCapture >= captures.length) selectedCapture = captures.length - 1;
   renderCaptureStrip();
   document.getElementById('analyzeBtn').disabled = captures.length === 0;
+  document.getElementById('renderBtn').disabled = captures.length === 0;
 }
 
 // ── AI Analysis ─────────────────────────────────────────────
 async function analyzeAndSuggest() {
-  if (captures.length === 0 || selectedCapture < 0) return alert('Capture at least one angle first');
+  if (captures.length === 0) return alert('Capture at least one angle first');
   if (!geminiKey) return alert('Enter your Gemini API key');
 
   const btn = document.getElementById('analyzeBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Analyzing...';
-  showStatus('analysisStatus', 'Sending image to Gemini for analysis...', 'info');
-
-  const cap = captures[selectedCapture];
-  let b64 = cap.base64;
-  if (!b64) {
-    try { b64 = await urlToBase64(cap.url); cap.base64 = b64; }
-    catch { showStatus('analysisStatus', 'Could not convert image. Sending URL description instead.', 'error'); }
-  }
+  showStatus('analysisStatus', `Sending ${captures.length} angle${captures.length > 1 ? 's' : ''} to Gemini for analysis...`, 'info');
 
   const style = document.getElementById('styleSelect').value;
   const budget = document.getElementById('budgetSelect').value;
   const styleTxt = style === 'auto' ? 'choose the best style for this house' : style;
   const budgetTxt = { low: 'under $5,000', medium: '$5,000-$20,000', high: '$20,000+' }[budget];
 
-  const prompt = `You are a home exterior design consultant. Analyze this real Google Street View photo of a house.
+  const angleContext = captures.length > 1
+    ? `I'm providing ${captures.length} different angles of the same house so you can see the full exterior. Use all angles to understand the complete picture.\n\n`
+    : '';
 
-Based on what you actually see in THIS specific photo, suggest 6-8 specific curb appeal improvements.
+  const prompt = `${angleContext}You are a home exterior design consultant. Analyze ${captures.length > 1 ? 'these real Google Street View photos' : 'this real Google Street View photo'} of a house.
+
+Based on what you actually see in ${captures.length > 1 ? 'THESE specific photos' : 'THIS specific photo'}, suggest 6-8 specific curb appeal improvements.
 Design style preference: ${styleTxt}. Budget: ${budgetTxt}.
 
 For each improvement return JSON with this structure:
@@ -538,12 +470,15 @@ For each improvement return JSON with this structure:
 "title":"Short title","description":"1-2 sentence description of the specific change",
 "impact":"high"|"medium"|"low","cost":"$"|"$$"|"$$$"}]}
 
-Be specific to what you SEE in the photo. Reference actual features (the brick, the porch, the driveway, the yard, etc). Return ONLY valid JSON.`;
+Be specific to what you SEE in the photos. Reference actual features (the brick, the porch, the driveway, the yard, etc). Return ONLY valid JSON.`;
 
   try {
     const parts = [];
-    if (b64) {
-      parts.push({ inlineData: { mimeType: 'image/jpeg', data: b64 } });
+    // Send ALL captured angles
+    for (const cap of captures) {
+      if (cap.base64) {
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: cap.base64 } });
+      }
     }
     parts.push({ text: prompt });
 
@@ -601,38 +536,50 @@ Keep the same basic house structure, viewing angle, and surrounding context. Mak
 
 // ── Render Makeover ─────────────────────────────────────────
 async function renderMakeover() {
-  if (captures.length === 0 || selectedCapture < 0) return alert('Capture an angle first');
+  if (captures.length === 0) return alert('Capture at least one angle first');
   if (!geminiKey) return alert('Enter your Gemini API key');
 
   const btn = document.getElementById('renderBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Rendering...';
-  showStatus('renderStatus', 'Generating AI makeover visualization (this takes 15-30 seconds)...', 'info');
 
-  const cap = captures[selectedCapture];
-  let b64 = cap.base64;
-  if (!b64) {
-    try { b64 = await urlToBase64(cap.url); cap.base64 = b64; }
-    catch { showStatus('renderStatus', 'Could not convert image for rendering.', 'error'); btn.disabled = false; return; }
+  let prompt = document.getElementById('promptArea').value.trim();
+  if (!prompt) {
+    prompt = 'Using these photos of a house exterior, generate a photorealistic improved version showing tasteful curb appeal upgrades: fresh landscaping, updated lighting, a cleaner driveway, and a refreshed front entrance. Keep the same house structure and style but make it look its absolute best.';
   }
 
-  const prompt = document.getElementById('promptArea').value;
+  // Send ALL captured angles so the model gets the full picture
+  const imgCount = captures.length;
+  showStatus('renderStatus', `Sending ${imgCount} angle${imgCount > 1 ? 's' : ''} to Gemini for makeover (this takes 15-30 seconds)...`, 'info');
 
   try {
+    const parts = [];
+
+    // Add all captured images
+    for (const cap of captures) {
+      if (cap.base64) {
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: cap.base64 } });
+      }
+    }
+
+    // Add context about the angles if multiple
+    if (imgCount > 1) {
+      parts.push({ text: `I'm providing ${imgCount} different angles of the same house so you can see the full exterior. Use all angles to understand the complete picture, including areas that may be obstructed in one view but visible in another.\n\n${prompt}` });
+    } else {
+      parts.push({ text: prompt });
+    }
+
     const body = {
-      contents: [{ parts: [
-        { inlineData: { mimeType: 'image/jpeg', data: b64 } },
-        { text: prompt }
-      ]}],
+      contents: [{ parts }],
       generationConfig: { temperature: 0.8, responseModalities: ['TEXT', 'IMAGE'] }
     };
 
-    const data = await callGemini('gemini-2.0-flash-exp-image-generation', body);
+    const data = await callGemini('gemini-3.1-flash-image-preview', body);
     const imgData = extractImage(data);
     if (imgData) {
       const container = document.getElementById('makeover-container');
       container.innerHTML = `<img src="data:image/png;base64,${imgData}" alt="AI Makeover">`;
-      showStatus('renderStatus', 'Makeover rendered! Compare with the original Street View above.', 'success');
+      showStatus('renderStatus', `Makeover rendered from ${imgCount} angle${imgCount > 1 ? 's' : ''}! Compare with the original Street View above.`, 'success');
     } else {
       const textResp = extractText(data);
       showStatus('renderStatus', `No image returned. Model response: ${textResp.substring(0, 200)}`, 'error');
