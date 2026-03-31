@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Curb Appeal Lab</title>
+<style>
+/* -- Reset & Base -- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f5f0;
+  --card: #ffffff;
+  --border: #e0ddd5;
+  --text: #2d2d2d;
+  --muted: #6b6b6b;
+  --primary: #2d6a4f;
+  --primary-hover: #1b4332;
+  --accent: #d4a373;
+  --danger: #c1121f;
+  --badge-low: #d8f3dc;
+  --badge-med: #fde68a;
+  --badge-high: #fecaca;
+  --badge-diy: #dbeafe;
+  --badge-contractor: #ede9fe;
+  --radius: 10px;
+  --shadow: 0 2px 8px rgba(0,0,0,.08);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,.12);
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* -- Header -- */
+header {
+  background: var(--primary);
+  color: white;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: var(--shadow);
+}
+header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; }
+header .subtitle { font-size: 0.85rem; opacity: 0.8; }
+
+/* -- API Key Banner -- */
+.api-key-banner {
+  background: #fff3cd;
+  border-bottom: 1px solid #ffc107;
+  padding: 0.6rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+.api-key-banner.hidden { display: none; }
+.api-key-banner input {
+  flex: 1;
+  max-width: 400px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+.api-key-banner button {
+  padding: 0.4rem 1rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+.api-key-banner .status-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.api-key-banner .status-dot.connected { background: #22c55e; }
+.api-key-banner .status-dot.disconnected { background: #ef4444; }
+
+/* -- Layout -- */
+.app-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr 340px;
+  gap: 1.25rem;
+  max-width: 1440px;
+  margin: 1.25rem auto;
+  padding: 0 1.25rem;
+}
+@media (max-width: 1100px) {
+  .app-grid { grid-template-columns: 1fr 1fr; }
+  .col-right { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .app-grid { grid-template-columns: 1fr; }
+}
+
+/* -- Cards -- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+}
+.card h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+/* -- Form Controls -- */
+label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem; color: var(--muted); }
+input[type="text"], select, textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: #fafaf8;
+  transition: border-color 0.2s;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+.field { margin-bottom: 1rem; }
+
+/* -- Buttons -- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  width: 100%;
+  justify-content: center;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-secondary { background: #e8e5dd; color: var(--text); }
+.btn-secondary:hover { background: #d5d2ca; }
+.btn-accent { background: var(--accent); color: white; }
+.btn-accent:hover { background: #c09060; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn + .btn { margin-top: 0.5rem; }
+
+/* -- Image Frames -- */
+.img-frame {
+  background: #f0ede5;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+.img-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: calc(var(--radius) - 2px);
+}
+.img-frame .placeholder {
+  text-align: center;
+  color: var(--muted);
+  padding: 2rem;
+}
+.img-frame .placeholder .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+/* -- Ideas List -- */
+.ideas-list { max-height: 420px; overflow-y: auto; }
+.idea-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.6rem;
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  transition: border-color 0.2s, background 0.2s;
+}
+.idea-card:hover { background: #fafaf8; }
+.idea-card.checked { border-color: var(--primary); background: #f0faf5; }
+.idea-card input[type="checkbox"] {
+  margin-top: 0.25rem;
+  width: 18px; height: 18px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+}
+.idea-info { flex: 1; }
+.idea-info h4 { font-size: 0.88rem; margin-bottom: 0.2rem; }
+.idea-info p { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; }
+.badges { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 99px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.badge-low { background: var(--badge-low); color: #1b4332; }
+.badge-medium { background: var(--badge-med); color: #78350f; }
+.badge-high { background: var(--badge-high); color: #991b1b; }
+.badge-diy { background: var(--badge-diy); color: #1e40af; }
+.badge-contractor { background: var(--badge-contractor); color: #5b21b6; }
+
+/* -- Prompt area -- */
+textarea#finalPrompt { min-height: 120px; resize: vertical; font-size: 0.82rem; }
+
+/* -- Spinner -- */
+.spinner {
+  display: none;
+  width: 36px; height: 36px;
+  border: 4px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading .spinner { display: block; }
+.loading .placeholder-text { display: none; }
+
+/* -- Status bar -- */
+.status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--primary);
+  color: white;
+  font-size: 0.82rem;
+  padding: 0.5rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  transform: translateY(100%);
+  transition: transform 0.3s;
+  z-index: 100;
+}
+.status-bar.visible { transform: translateY(0); }
+
+/* -- Misc -- */
+.comparison-container { position: relative; }
+.comparison-container .img-frame { min-height: 320px; }
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  background: rgba(255,255,255,0.25);
+  color: white;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.btn-secondary .step-number { background: var(--primary); color: white; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Curb Appeal Lab</h1>
+    <div class="subtitle">AI-powered home exterior makeover visualization</div>
+  </div>
+</header>
+
+<!-- API Key Config Bar -->
+<div class="api-key-banner" id="apiKeyBanner">
+  <span class="status-dot disconnected" id="keyStatusDot"></span>
+  <span>Gemini API Key:</span>
+  <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key here...">
+  <button onclick="saveApiKey()">Save Key</button>
+  <span style="color:var(--muted);font-size:0.78rem;" id="keyStatusLabel">Not configured</span>
+</div>
+
+<div class="app-grid">
+
+  <!-- LEFT COLUMN: Controls -->
+  <div class="col-left">
+    <div class="card">
+      <h2>Address & Style</h2>
+
+      <div class="field">
+        <label for="address">Street Address</label>
+        <input type="text" id="address" value="633 Irvin Ave, Eden, NC" placeholder="Enter a street address...">
+      </div>
+
+      <div class="field">
+        <label for="style">Design Style</label>
+        <select id="style">
+          <option value="auto">Auto (AI picks)</option>
+          <option value="modern">Modern</option>
+          <option value="traditional">Traditional</option>
+          <option value="farmhouse">Farmhouse</option>
+          <option value="minimal">Minimal</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="budget">Budget Band</label>
+        <select id="budget">
+          <option value="low">Low (DIY)</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary" id="btnStreetView" onclick="loadStreetView()">
+        <span class="step-number">1</span> Generate Street View
+      </button>
+
+      <button class="btn btn-secondary" id="btnSuggestions" onclick="getSuggestions()">
+        <span class="step-number">2</span> Get AI Ideas
+      </button>
+
+      <button class="btn btn-accent" id="btnRender" onclick="renderMakeover()" disabled>
+        <span class="step-number">3</span> Render with Nano Banana
+      </button>
+
+      <hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border);">
+
+      <button class="btn btn-secondary" onclick="loadSampleIdeas()">
+        Load Sample Ideas (offline)
+      </button>
+    </div>
+  </div>
+
+  <!-- MIDDLE COLUMN: Before / After -->
+  <div class="col-middle">
+    <div class="card comparison-container">
+      <h2>Current Street View</h2>
+      <div class="img-frame" id="beforeFrame">
+        <div class="placeholder" id="beforePlaceholder">
+          <div class="icon">&#127968;</div>
+          <div class="placeholder-text">Enter an address and click "Generate Street View" to see a photo of the home.</div>
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card comparison-container" style="margin-top: 1.25rem;">
+      <h2>AI Makeover Preview</h2>
+      <div class="img-frame" id="afterFrame">
+        <div class="placeholder" id="afterPlaceholder">
+          <div class="icon">&#127912;</div>
+          <div class="placeholder-text">Select your improvement ideas and click "Render with Nano Banana" to generate the makeover.</div>
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN: Ideas & Prompt -->
+  <div class="col-right">
+    <div class="card">
+      <h2>Improvement Ideas</h2>
+      <div class="ideas-list" id="ideasList">
+        <div style="text-align:center;color:var(--muted);padding:2rem 1rem;">
+          Click "Get AI Ideas" or "Load Sample Ideas" to populate suggestions.
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 1.25rem;">
+      <h2>Final Prompt</h2>
+      <div class="field">
+        <label for="finalPrompt">Instructions for Nano Banana image model</label>
+        <textarea id="finalPrompt" placeholder="Select ideas above to auto-build the prompt, or type your own instructions..."></textarea>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Status bar -->
+<div class="status-bar" id="statusBar">
+  <span id="statusText">Ready</span>
+  <span id="statusTimer"></span>
+</div>
+
+<script>
+// =====================================================
+//  Curb Appeal Lab - Fully Client-Side (no backend)
+//  Calls Gemini API directly from the browser.
+// =====================================================
+
+// -- API Key Management (in-memory only) --
+let GEMINI_API_KEY = '';
+let beforeImageB64 = null;  // store the generated street view for use in render
+
+function saveApiKey() {
+  const input = document.getElementById('apiKeyInput');
+  const key = input.value.trim();
+  if (!key) return;
+  GEMINI_API_KEY = key;
+  input.value = '';
+  input.type = 'text';
+  input.value = key.slice(0, 8) + '...' + key.slice(-4);
+  input.disabled = true;
+  document.getElementById('keyStatusDot').className = 'status-dot connected';
+  document.getElementById('keyStatusLabel').textContent = 'Connected';
+  showStatus('API key saved! Ready to go.', 3000);
+}
+
+// Auto-load key from URL param ?key=... so you can bookmark it on mobile
+(function autoLoadKey() {
+  var params = new URLSearchParams(window.location.search);
+  var urlKey = params.get('key');
+  if (urlKey) {
+    GEMINI_API_KEY = urlKey;
+    var input = document.getElementById('apiKeyInput');
+    input.value = urlKey.slice(0, 8) + '...' + urlKey.slice(-4);
+    input.disabled = true;
+    document.getElementById('keyStatusDot').className = 'status-dot connected';
+    document.getElementById('keyStatusLabel').textContent = 'Connected via URL';
+    document.getElementById('apiKeyBanner').classList.add('hidden');
+  }
+})();
+
+// -- State --
+let ideas = [];
+let statusTimeout = null;
+
+// -- Helpers --
+function showStatus(msg, duration) {
+  if (duration === undefined) duration = 4000;
+  const bar = document.getElementById('statusBar');
+  document.getElementById('statusText').textContent = msg;
+  bar.classList.add('visible');
+  clearTimeout(statusTimeout);
+  if (duration > 0) {
+    statusTimeout = setTimeout(function() { bar.classList.remove('visible'); }, duration);
+  }
+}
+
+function hideStatus() {
+  document.getElementById('statusBar').classList.remove('visible');
+}
+
+function setLoading(frameId, loading) {
+  var frame = document.getElementById(frameId);
+  if (loading) frame.classList.add('loading');
+  else frame.classList.remove('loading');
+}
+
+function setImage(frameId, url) {
+  var frame = document.getElementById(frameId);
+  var placeholder = frame.querySelector('.placeholder');
+  if (placeholder) placeholder.style.display = 'none';
+  var img = frame.querySelector('img');
+  if (!img) {
+    img = document.createElement('img');
+    frame.appendChild(img);
+  }
+  img.src = url;
+  img.alt = frameId === 'beforeFrame' ? 'Street View of home' : 'AI generated makeover';
+}
+
+function setImageFromBase64(frameId, base64Data, mimeType) {
+  var dataUrl = 'data:' + mimeType + ';base64,' + base64Data;
+  setImage(frameId, dataUrl);
+}
+
+async function callGemini(model, payload, timeoutMs) {
+  if (!GEMINI_API_KEY) throw new Error('Please enter your Gemini API key first.');
+  if (!timeoutMs) timeoutMs = 60000;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + GEMINI_API_KEY;
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+  try {
+    var resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if (!resp.ok) {
+      var errText = await resp.text();
+      if (resp.status === 429) throw new Error('Rate limit reached. Free tier Gemini image generation has daily quotas. Try again in a few hours, or use a different API key.');
+      throw new Error('Gemini API error (' + resp.status + '): ' + errText.slice(0, 200));
+    }
+    return await resp.json();
+  } catch(e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') throw new Error('Request timed out. Please try again.');
+    throw e;
+  }
+}
+
+function extractImage(data) {
+  var candidates = data.candidates || [];
+  if (!candidates.length) return null;
+  var parts = (candidates[0].content || {}).parts || [];
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i].inlineData) {
+      return {
+        data: parts[i].inlineData.data,
+        mimeType: parts[i].inlineData.mimeType || 'image/png'
+      };
+    }
+  }
+  return null;
+}
+
+function extractText(data) {
+  var candidates = data.candidates || [];
+  if (!candidates.length) return '';
+  var parts = (candidates[0].content || {}).parts || [];
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i].text) return parts[i].text;
+  }
+  return '';
+}
+
+
+// ===================== 1. GENERATE STREET VIEW =====================
+async function loadStreetView() {
+  var address = document.getElementById('address').value.trim();
+  if (!address) return alert('Please enter an address.');
+  if (!GEMINI_API_KEY) return alert('Please enter your Gemini API key first.');
+
+  document.getElementById('btnStreetView').disabled = true;
+  setLoading('beforeFrame', true);
+  showStatus('Generating street view image with Gemini... this may take 15-30s', 0);
+
+  try {
+    var prompt = 'Generate a photorealistic Google Street View style photograph of a residential home at the address: ' + address + '. ' +
+      'Show the front of the house from the street perspective, as if captured by a Google Street View car camera. ' +
+      'Include the yard, driveway, and any visible landscaping. ' +
+      'Make it look like an authentic, unedited street-level photograph taken on a clear day. ' +
+      'The home should look like a typical residential property you would find at this address.';
+
+    var payload = {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+    };
+
+    var data = await callGemini('gemini-2.0-flash-exp-image-generation', payload, 90000);
+    var img = extractImage(data);
+    if (!img) throw new Error('Gemini did not return an image. Try again or try a different address.');
+
+    beforeImageB64 = img.data;
+    setImageFromBase64('beforeFrame', img.data, img.mimeType);
+    document.getElementById('btnSuggestions').disabled = false;
+    showStatus('Street view generated!');
+  } catch (e) {
+    showStatus('Error: ' + e.message, 8000);
+    setLoading('beforeFrame', false);
+  } finally {
+    document.getElementById('btnStreetView').disabled = false;
+  }
+}
+
+
+// ===================== 2. GET AI SUGGESTIONS =====================
+// Hardcoded ideas as fallback
+var HARDCODED_IDEAS = {
+  facade: [
+    { title: 'Repaint siding in warm light gray', description: 'A fresh coat of warm gray paint modernizes the exterior instantly and pairs well with almost any accent color.', cost: 'medium', complexity: 'DIY' },
+    { title: 'Darken front door & update hardware', description: 'A bold charcoal or navy door with brushed-nickel hardware creates a strong focal point.', cost: 'low', complexity: 'DIY' },
+    { title: 'Upgrade porch lighting', description: 'Replace dated fixtures with modern sconce-style lights on either side of the door for evening curb appeal.', cost: 'low', complexity: 'DIY' },
+    { title: 'Add window shutters', description: 'Board-and-batten style shutters in a contrasting dark tone frame the windows and add depth.', cost: 'medium', complexity: 'DIY' },
+    { title: 'Install new house numbers & mailbox', description: 'Large, modern floating house numbers and a matching mailbox give the entrance a designer touch.', cost: 'low', complexity: 'DIY' }
+  ],
+  landscaping: [
+    { title: 'Add curved foundation planting bed', description: 'A sweeping bed of mixed shrubs and perennials along the front foundation softens hard lines and adds color.', cost: 'medium', complexity: 'DIY' },
+    { title: 'Define walkway edges with pavers', description: 'Brick or stone edging along the front path creates a clean, intentional look.', cost: 'medium', complexity: 'DIY' },
+    { title: 'Plant two small ornamental trees', description: 'Crepe myrtles or Japanese maples flanking the yard frame the house and add seasonal interest.', cost: 'medium', complexity: 'contractor' },
+    { title: 'Lay fresh mulch in all beds', description: 'Dark hardwood mulch instantly tidies beds and makes plant colors pop.', cost: 'low', complexity: 'DIY' },
+    { title: 'Add landscape lighting along walkway', description: 'Low-voltage path lights create a welcoming glow and highlight landscaping at night.', cost: 'medium', complexity: 'DIY' }
+  ]
+};
+
+async function getSuggestions() {
+  var address = document.getElementById('address').value.trim();
+  var style = document.getElementById('style').value;
+  var budget = document.getElementById('budget').value;
+
+  document.getElementById('btnSuggestions').disabled = true;
+  showStatus('Generating improvement ideas...', 0);
+
+  // Start with hardcoded ideas
+  var result = JSON.parse(JSON.stringify(HARDCODED_IDEAS));
+
+  // Try to get LLM-enhanced suggestions
+  if (GEMINI_API_KEY) {
+    try {
+      var prompt = 'You are a residential exterior design consultant. Given a home at "' + address + '", suggest improvements.\n' +
+        'Style preference: ' + style + '. Budget: ' + budget + '.\n\n' +
+        'Return ONLY valid JSON (no markdown, no code fences) in this exact shape:\n' +
+        '{\n  "facade": [\n    {"title": "...", "description": "one sentence", "cost": "low|medium|high", "complexity": "DIY|contractor"}\n  ],\n' +
+        '  "landscaping": [\n    {"title": "...", "description": "one sentence", "cost": "low|medium|high", "complexity": "DIY|contractor"}\n  ]\n}\n' +
+        'Provide 4-5 ideas per category. Keep descriptions under 30 words each.';
+
+      var payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
+      };
+
+      var data = await callGemini('gemini-2.0-flash', payload, 30000);
+      var text = extractText(data).trim();
+      // Strip code fences
+      if (text.startsWith('```')) text = text.split('\n').slice(1).join('\n');
+      if (text.endsWith('```')) text = text.slice(0, text.lastIndexOf('```'));
+      text = text.trim();
+      var parsed = JSON.parse(text);
+      if (parsed.facade && parsed.landscaping) result = parsed;
+    } catch (e) {
+      // Fall back to hardcoded silently
+      console.log('LLM suggestions failed, using hardcoded:', e.message);
+    }
+  }
+
+  // Filter by budget
+  var budgetMap = { low: ['low'], medium: ['low', 'medium'], high: ['low', 'medium', 'high'] };
+  var allowed = budgetMap[budget] || ['low', 'medium', 'high'];
+  result.facade = (result.facade || []).filter(function(i) { return allowed.indexOf(i.cost) !== -1; });
+  result.landscaping = (result.landscaping || []).filter(function(i) { return allowed.indexOf(i.cost) !== -1; });
+
+  ideas = []
+    .concat((result.facade || []).map(function(i) { i.category = 'Facade'; return i; }))
+    .concat((result.landscaping || []).map(function(i) { i.category = 'Landscaping'; return i; }));
+
+  renderIdeas();
+  showStatus(ideas.length + ' improvement ideas loaded!');
+  document.getElementById('btnSuggestions').disabled = false;
+}
+
+
+// ===================== LOAD SAMPLE IDEAS (OFFLINE) =====================
+function loadSampleIdeas() {
+  ideas = [
+    { title: 'Repaint siding in warm light gray', description: 'A fresh coat of warm gray paint modernizes the exterior instantly.', cost: 'medium', complexity: 'DIY', category: 'Facade' },
+    { title: 'Darken front door & update hardware', description: 'A bold charcoal or navy door with brushed-nickel hardware creates a strong focal point.', cost: 'low', complexity: 'DIY', category: 'Facade' },
+    { title: 'Upgrade porch lighting', description: 'Replace dated fixtures with modern sconce-style lights.', cost: 'low', complexity: 'DIY', category: 'Facade' },
+    { title: 'Add window shutters', description: 'Board-and-batten style shutters in contrasting dark tone.', cost: 'medium', complexity: 'DIY', category: 'Facade' },
+    { title: 'Install new house numbers & mailbox', description: 'Large modern floating numbers and matching mailbox.', cost: 'low', complexity: 'DIY', category: 'Facade' },
+    { title: 'Add curved foundation planting bed', description: 'Mixed shrubs and perennials along the front foundation.', cost: 'medium', complexity: 'DIY', category: 'Landscaping' },
+    { title: 'Define walkway edges with pavers', description: 'Brick or stone edging along the front path.', cost: 'medium', complexity: 'DIY', category: 'Landscaping' },
+    { title: 'Plant two ornamental trees', description: 'Crepe myrtles flanking the yard for framing.', cost: 'medium', complexity: 'contractor', category: 'Landscaping' },
+    { title: 'Lay fresh dark mulch', description: 'Dark hardwood mulch tidies beds and makes colors pop.', cost: 'low', complexity: 'DIY', category: 'Landscaping' },
+    { title: 'Add landscape lighting', description: 'Low-voltage path lights for evening curb appeal.', cost: 'medium', complexity: 'DIY', category: 'Landscaping' }
+  ];
+  renderIdeas();
+  document.querySelectorAll('.idea-card input[type="checkbox"]').forEach(function(cb) {
+    cb.checked = true;
+    cb.closest('.idea-card').classList.add('checked');
+  });
+  rebuildPrompt();
+  showStatus('Sample ideas loaded! You can test without API calls.');
+}
+
+
+// ===================== RENDER IDEAS LIST =====================
+function renderIdeas() {
+  var container = document.getElementById('ideasList');
+  if (ideas.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem;">No ideas yet.</div>';
+    return;
+  }
+
+  var currentCategory = '';
+  var html = '';
+
+  ideas.forEach(function(idea, idx) {
+    if (idea.category !== currentCategory) {
+      currentCategory = idea.category;
+      html += '<div style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin:0.75rem 0 0.4rem;padding-left:0.25rem;">' + currentCategory + '</div>';
+    }
+    var costClass = 'badge-' + idea.cost;
+    var complexClass = idea.complexity.toLowerCase() === 'diy' ? 'badge-diy' : 'badge-contractor';
+    html += '<div class="idea-card" id="idea-' + idx + '">' +
+      '<input type="checkbox" onchange="toggleIdea(' + idx + ', this)" checked>' +
+      '<div class="idea-info">' +
+      '<h4>' + idea.title + '</h4>' +
+      '<p>' + idea.description + '</p>' +
+      '<div class="badges">' +
+      '<span class="badge ' + costClass + '">$ ' + idea.cost + '</span>' +
+      '<span class="badge ' + complexClass + '">' + idea.complexity + '</span>' +
+      '</div></div></div>';
+  });
+
+  container.innerHTML = html;
+  container.querySelectorAll('.idea-card').forEach(function(card) { card.classList.add('checked'); });
+  document.getElementById('btnRender').disabled = false;
+  rebuildPrompt();
+}
+
+function toggleIdea(idx, checkbox) {
+  var card = document.getElementById('idea-' + idx);
+  card.classList.toggle('checked', checkbox.checked);
+  rebuildPrompt();
+}
+
+
+// ===================== BUILD PROMPT =====================
+function rebuildPrompt() {
+  var address = document.getElementById('address').value.trim();
+  var style = document.getElementById('style').value;
+  var budget = document.getElementById('budget').value;
+
+  var selected = [];
+  document.querySelectorAll('.idea-card').forEach(function(card, idx) {
+    var cb = card.querySelector('input[type="checkbox"]');
+    if (cb && cb.checked && ideas[idx]) selected.push(ideas[idx]);
+  });
+
+  if (selected.length === 0) {
+    document.getElementById('finalPrompt').value = '';
+    document.getElementById('btnRender').disabled = true;
+    return;
+  }
+
+  document.getElementById('btnRender').disabled = false;
+
+  var styleName = style === 'auto' ? 'appropriate' : style;
+  var prompt = 'Using the attached photo of a house as reference, generate a NEW photorealistic image of the SAME house from the SAME camera angle, but with these exterior improvements applied:\n\n';
+
+  selected.forEach(function(idea, i) {
+    prompt += (i + 1) + '. ' + idea.title + ': ' + idea.description + '\n';
+  });
+
+  prompt += '\nStyle: ' + styleName + ', Budget: ' + budget + '.\n';
+  prompt += 'Keep the same house structure, roof shape, lot, and camera angle. Make all improvements look realistic and naturally integrated. The result should look like a professional "after" photo for a home renovation project.';
+
+  document.getElementById('finalPrompt').value = prompt;
+}
+
+
+// ===================== 3. RENDER MAKEOVER =====================
+async function renderMakeover() {
+  var address = document.getElementById('address').value.trim();
+  var prompt = document.getElementById('finalPrompt').value.trim();
+  if (!prompt) return alert('Please select some ideas or write a prompt first.');
+  if (!GEMINI_API_KEY) return alert('Please enter your Gemini API key first.');
+
+  document.getElementById('btnRender').disabled = true;
+  setLoading('afterFrame', true);
+  showStatus('Generating AI makeover with Gemini... this may take 30-60 seconds.', 0);
+
+  var startTime = Date.now();
+  var timerInterval = setInterval(function() {
+    var elapsed = Math.round((Date.now() - startTime) / 1000);
+    document.getElementById('statusTimer').textContent = elapsed + 's';
+  }, 1000);
+
+  try {
+    var parts = [];
+
+    // Include reference image if we have one
+    if (beforeImageB64) {
+      parts.push({
+        inlineData: {
+          mimeType: 'image/png',
+          data: beforeImageB64
+        }
+      });
+    }
+
+    var renderPrompt = 'You are an expert architectural visualization artist. ';
+    if (beforeImageB64) {
+      renderPrompt += 'Using the attached photo of a house as reference, generate a NEW photorealistic image of the SAME house from the SAME camera angle and perspective, but with the following exterior improvements applied:\n\n';
+    } else {
+      renderPrompt += 'Generate a photorealistic image of a residential home at ' + address + ' with the following exterior improvements:\n\n';
+    }
+    renderPrompt += prompt + '\n\n';
+    renderPrompt += 'IMPORTANT: Keep the same house structure, roof shape, lot, and camera angle. Make the improvements look realistic and naturally integrated. The result should look like a professional "after" photo for a home renovation project. Ensure the lighting, shadows, and environment match a real neighborhood setting.';
+
+    parts.push({ text: renderPrompt });
+
+    var payload = {
+      contents: [{ role: 'user', parts: parts }],
+      generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+    };
+
+    var data = await callGemini('gemini-2.0-flash-exp-image-generation', payload, 120000);
+    var img = extractImage(data);
+    if (!img) throw new Error('Gemini did not return an image. The model may need a different prompt or the quota may be exhausted.');
+
+    setImageFromBase64('afterFrame', img.data, img.mimeType);
+    var elapsed = Math.round((Date.now() - startTime) / 1000);
+    showStatus('Makeover generated in ' + elapsed + 's!');
+  } catch (e) {
+    showStatus('Error: ' + e.message, 8000);
+    setLoading('afterFrame', false);
+  } finally {
+    clearInterval(timerInterval);
+    document.getElementById('statusTimer').textContent = '';
+    document.getElementById('btnRender').disabled = false;
+  }
+}
+</script>
+</body>
+</html>
