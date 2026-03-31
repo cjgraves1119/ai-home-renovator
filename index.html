@@ -382,22 +382,27 @@ async function captureAngle() {
   const fov = Math.round(180 / Math.pow(2, zoom));
   const heading = Math.round((pov.heading + 360) % 360);
   const pitch = Math.round(pov.pitch);
+  const panoId = panorama.getPano();
 
-  showStatus('svStatus', 'Capturing angle from panorama...', 'info');
+  showStatus('svStatus', 'Capturing angle...', 'info');
 
   try {
-    // Grab the image directly from the panorama's canvas (no API call needed)
-    const container = document.getElementById('sv-panorama');
-    const canvas = container.querySelector('canvas');
-    if (!canvas) throw new Error('Panorama canvas not found. Make sure Street View has loaded.');
+    // WebGL canvases can't be read back via toDataURL (preserveDrawingBuffer=false).
+    // Use Street View Static API to get a clean JPEG at the current exact POV.
+    const staticUrl = `https://maps.googleapis.com/maps/api/streetview?size=800x500&pano=${panoId}&heading=${heading}&pitch=${pitch}&fov=${fov}&key=${mapsKey}`;
 
-    // Create a copy canvas at a good resolution
-    const copyCanvas = document.createElement('canvas');
-    copyCanvas.width = canvas.width;
-    copyCanvas.height = canvas.height;
-    copyCanvas.getContext('2d').drawImage(canvas, 0, 0);
-    const base64 = copyCanvas.toDataURL('image/jpeg', 0.9).split(',')[1];
-    const dataUrl = 'data:image/jpeg;base64,' + base64;
+    // Fetch via XHR so we can convert to base64 without CORS issues
+    const blob = await fetch(staticUrl).then(r => {
+      if (!r.ok) throw new Error(`Static API error: ${r.status}`);
+      return r.blob();
+    });
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    const base64 = dataUrl.split(',')[1];
 
     captures.push({ url: dataUrl, base64, heading, pitch, zoom, fov });
     selectedCapture = captures.length - 1;
