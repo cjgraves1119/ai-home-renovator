@@ -291,7 +291,7 @@ function updateKeyStatus() {
 function loadMapsAPI() {
   if (mapsReady) return;
   const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&callback=onMapsReady`;
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&libraries=geometry&callback=onMapsReady`;
   script.async = true;
   script.defer = true;
   script.onerror = () => showStatus('svStatus', 'Failed to load Google Maps API. Check your Maps key.', 'error');
@@ -328,8 +328,8 @@ async function loadStreetView() {
       throw new Error(`No Street View imagery found for this address (${meta.status})`);
     }
 
-    const lat = meta.location.lat;
-    const lng = meta.location.lng;
+    const svLat = meta.location.lat;
+    const svLng = meta.location.lng;
     const panoId = meta.pano_id;
 
     // Wait for Maps API if needed
@@ -338,18 +338,40 @@ async function loadStreetView() {
       await new Promise(r => { const check = setInterval(() => { if (mapsReady) { clearInterval(check); r(); }}, 200); });
     }
 
+    // Geocode the address to get the actual house location
+    let initHeading = 0;
+    try {
+      const geocoder = new google.maps.Geocoder();
+      const geoResult = await new Promise((resolve, reject) => {
+        geocoder.geocode({ address }, (results, status) => {
+          if (status === 'OK' && results[0]) resolve(results[0]);
+          else reject(new Error(status));
+        });
+      });
+      const houseLat = geoResult.geometry.location.lat();
+      const houseLng = geoResult.geometry.location.lng();
+      // Calculate heading from Street View camera to the house
+      initHeading = google.maps.geometry.spherical.computeHeading(
+        new google.maps.LatLng(svLat, svLng),
+        new google.maps.LatLng(houseLat, houseLng)
+      );
+    } catch (e) {
+      // If geocoding fails, default to 0
+      console.warn('Geocode failed, using default heading:', e);
+    }
+
     // Clear placeholder and init panorama
     document.getElementById('svPlaceholder')?.remove();
 
     if (panorama) {
       panorama.setPano(panoId);
-      panorama.setPov({ heading: 0, pitch: 0 });
+      panorama.setPov({ heading: initHeading, pitch: 0 });
       panorama.setZoom(1);
     } else {
       panorama = new google.maps.StreetViewPanorama(
         document.getElementById('sv-panorama'), {
           pano: panoId,
-          pov: { heading: 0, pitch: 0 },
+          pov: { heading: initHeading, pitch: 0 },
           zoom: 1,
           addressControl: false,
           showRoadLabels: false,
@@ -368,10 +390,10 @@ async function loadStreetView() {
     // Show angle controls + readout
     document.getElementById('angleControls').style.display = 'block';
     document.getElementById('povReadout').style.display = 'flex';
-    document.getElementById('headingSlider').value = 0;
+    document.getElementById('headingSlider').value = Math.round((initHeading + 360) % 360);
     document.getElementById('pitchSlider').value = 0;
     document.getElementById('zoomSlider').value = 1;
-    syncSliderLabels(0, 0, 1);
+    syncSliderLabels(initHeading, 0, 1);
 
     // Clear old captures
     captures = [];
