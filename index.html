@@ -62,6 +62,16 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 .lightbox-overlay .lb-close:hover{background:rgba(255,255,255,.3)}
 .lightbox-overlay .lb-label{position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.7);font-size:.8rem;font-family:monospace}
 
+/* 3D Viewer */
+#viewer3d{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:1002;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem}
+#viewer3dCanvas{width:90vw;height:72vh;border-radius:10px;overflow:hidden;cursor:grab;background:#000}
+#viewer3dCanvas:active{cursor:grabbing}
+.viewer3d-label{color:rgba(255,255,255,.55);font-size:.8rem;margin-top:.65rem;font-family:monospace;text-align:center}
+.viewer3d-close{position:fixed;top:1rem;right:1.25rem;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.4rem;width:38px;height:38px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
+.viewer3d-close:hover{background:rgba(255,255,255,.3)}
+.capture-thumb .btn3d{position:absolute;bottom:2px;left:2px;background:rgba(45,106,79,.85);color:#fff;border:none;border-radius:4px;padding:1px 5px;font-size:.6rem;font-weight:700;cursor:pointer;opacity:0;transition:opacity .2s;letter-spacing:.03em}
+.capture-thumb:hover .btn3d{opacity:1}
+
 /* Upload dropzone */
 .upload-zone{border:2px dashed var(--border);border-radius:8px;padding:1rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;font-size:.85rem;color:var(--muted);margin-top:.75rem}
 .upload-zone:hover,.upload-zone.drag-over{border-color:var(--primary);background:#f0faf4}
@@ -238,11 +248,19 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 
 </div>
 
+<!-- 3D Depth Viewer -->
+<div id="viewer3d" style="display:none">
+  <button class="viewer3d-close" onclick="close3DViewer()">✕</button>
+  <div id="viewer3dCanvas"></div>
+  <div class="viewer3d-label" id="viewer3dLabel">Building depth map...</div>
+</div>
+
 <!-- Lightbox -->
 <div class="lightbox-overlay" id="lightbox" style="display:none" onclick="closeLightbox(event)">
   <button class="lb-close" onclick="closeLightbox()">✕</button>
   <img id="lightboxImg" src="" alt="Captured angle">
   <div class="lb-label" id="lightboxLabel"></div>
+  <button id="lightbox3dBtn" onclick="closeLightbox();open3DViewer(selectedCapture)" style="position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;border:none;border-radius:6px;padding:.5rem 1.25rem;font-size:.85rem;font-weight:600;cursor:pointer;letter-spacing:.02em">🧊 View in 3D</button>
 </div>
 
 <script>
@@ -446,7 +464,7 @@ function renderCaptureStrip() {
   captures.forEach((cap, i) => {
     const thumb = document.createElement('div');
     thumb.className = `capture-thumb ${i === selectedCapture ? 'selected' : ''}`;
-    thumb.innerHTML = `<img src="${cap.url}" alt="Angle ${i+1}"><button class="remove-btn" onclick="event.stopPropagation();removeCapture(${i})">✕</button>`;
+    thumb.innerHTML = `<img src="${cap.url}" alt="Angle ${i+1}"><button class="remove-btn" onclick="event.stopPropagation();removeCapture(${i})">✕</button><button class="btn3d" onclick="event.stopPropagation();open3DViewer(${i})" title="View in 3D">3D</button>`;
     thumb.onclick = () => selectCapture(i);
     strip.appendChild(thumb);
   });
@@ -776,6 +794,159 @@ function loadSampleIdeas() {
   document.getElementById('renderBtn').disabled = captures.length === 0;
   showStatus('analysisStatus', 'Sample ideas loaded. Select the ones you want and proceed to render.', 'success');
 }
+
+// ── 3D Depth Viewer ─────────────────────────────────────────
+let _three = null; // cached Three.js scene
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) return res();
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+async function open3DViewer(i) {
+  const cap = captures[i];
+  if (!cap) return;
+  const overlay = document.getElementById('viewer3d');
+  overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  document.getElementById('viewer3dLabel').textContent = 'Building depth map...';
+
+  // Dispose previous scene
+  if (_three) { _three.renderer.dispose(); _three = null; }
+  document.getElementById('viewer3dCanvas').innerHTML = '';
+
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
+
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => build3DScene(cap, img);
+  img.onerror = () => document.getElementById('viewer3dLabel').textContent = 'Could not load image for 3D view.';
+  img.src = cap.url;
+}
+
+function build3DScene(cap, img) {
+  const container = document.getElementById('viewer3dCanvas');
+  const W = img.naturalWidth, H = img.naturalHeight;
+
+  // ── Build depth map via luminance + canvas blur ──────────
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const ctx = off.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const px = ctx.getImageData(0, 0, W, H).data;
+
+  // Luminance → grayscale depth canvas
+  const grayCanvas = document.createElement('canvas');
+  grayCanvas.width = W; grayCanvas.height = H;
+  const gCtx = grayCanvas.getContext('2d');
+  const gData = gCtx.createImageData(W, H);
+  for (let i = 0; i < W * H; i++) {
+    const lum = 255 - Math.round(0.299*px[i*4] + 0.587*px[i*4+1] + 0.114*px[i*4+2]);
+    gData.data[i*4] = gData.data[i*4+1] = gData.data[i*4+2] = lum;
+    gData.data[i*4+3] = 255;
+  }
+  gCtx.putImageData(gData, 0, 0);
+
+  // Blur for smooth depth transitions
+  const blurRadius = Math.max(6, Math.floor(W / 60));
+  const blurCanvas = document.createElement('canvas');
+  blurCanvas.width = W; blurCanvas.height = H;
+  const bCtx = blurCanvas.getContext('2d');
+  bCtx.filter = `blur(${blurRadius}px)`;
+  bCtx.drawImage(grayCanvas, 0, 0);
+  const depthPx = bCtx.getImageData(0, 0, W, H).data;
+
+  // ── Three.js scene ───────────────────────────────────────
+  const cW = container.clientWidth, cH = container.clientHeight;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(cW, cH);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  container.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0a0a);
+  const camera = new THREE.PerspectiveCamera(42, cW / cH, 0.1, 100);
+  camera.position.z = 3.2;
+
+  // Displaced plane mesh
+  const segs = 120;
+  const aspect = W / H;
+  const geo = new THREE.PlaneGeometry(4 * aspect, 4, segs * aspect | 0, segs);
+  const pos = geo.attributes.position;
+  const maxDisplace = 0.55;
+
+  for (let i = 0; i < pos.count; i++) {
+    const u = pos.getX(i) / (4 * aspect) + 0.5;
+    const v = pos.getY(i) / 4 + 0.5;
+    const px2 = Math.min(Math.floor(u * W), W - 1);
+    const py2 = Math.min(Math.floor((1 - v) * H), H - 1);
+    const d = depthPx[(py2 * W + px2) * 4] / 255;
+    pos.setZ(i, (d - 0.5) * maxDisplace);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+
+  const tex = new THREE.TextureLoader().load(cap.url);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, mat);
+  scene.add(mesh);
+
+  // Mouse parallax
+  let targetX = 0, targetY = 0, curX = 0, curY = 0;
+  const onMove = e => {
+    const rect = container.getBoundingClientRect();
+    targetX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.35;
+    targetY = -((e.clientY - rect.top) / rect.height - 0.5) * 0.25;
+  };
+  const onTouch = e => {
+    const t = e.touches[0];
+    const rect = container.getBoundingClientRect();
+    targetX = ((t.clientX - rect.left) / rect.width - 0.5) * 0.35;
+    targetY = -((t.clientY - rect.top) / rect.height - 0.5) * 0.25;
+  };
+  container.addEventListener('mousemove', onMove);
+  container.addEventListener('touchmove', onTouch);
+
+  // Animate
+  let animating = true;
+  function animate() {
+    if (!animating) return;
+    requestAnimationFrame(animate);
+    curX += (targetX - curX) * 0.06;
+    curY += (targetY - curY) * 0.06;
+    mesh.rotation.y = curX;
+    mesh.rotation.x = curY;
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  _three = { renderer, animating: true, cleanup: () => {
+    animating = false;
+    container.removeEventListener('mousemove', onMove);
+    container.removeEventListener('touchmove', onTouch);
+  }};
+
+  document.getElementById('viewer3dLabel').textContent =
+    `Move your mouse over the image to explore in 3D${cap.heading != null ? ` · ${cap.heading}° heading` : ''}`;
+}
+
+function close3DViewer() {
+  document.getElementById('viewer3d').style.display = 'none';
+  document.body.style.overflow = '';
+  if (_three) { _three.cleanup(); _three.renderer.dispose(); _three = null; }
+  document.getElementById('viewer3dCanvas').innerHTML = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    close3DViewer();
+    closeLightbox({ target: document.getElementById('lightbox'), currentTarget: document.getElementById('lightbox') });
+  }
+});
 
 // ── Boot ────────────────────────────────────────────────────
 init();
