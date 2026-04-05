@@ -249,7 +249,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 // ── Config & State ──────────────────────────────────────────
 const _xk=[73,29,54,87,11,66];
 function _dk(s){const b=atob(s);return Array.from(b).map((c,i)=>String.fromCharCode(c.charCodeAt(0)^_xk[i%_xk.length])).join('');}
-let mapsKey = _dk('CFRMNlg7CnAHDXwKKnp5O3E0J2gbM2cFCHp8MG0DPUoHY18XGVNB'), geminiKey = _dk('CFRMNlg7CGkHP3kjJlJvJ24oKlh4ZUQrKGlVEkZvOVMHFkQ1EWpn');
+let mapsKey = _dk('CFRMNlg7CnAHDXwKKnp5O3E0J2gbM2cFCHp8MG0DPUoHY18XGVNB'), geminiKey = _dk('CFRMNlg7CERmCFMWHC94HG00LVlEblFvK1l4NWoOC2QEGTgPPGpj');
 let panorama = null, svService = null;
 let captures = [];   // [{url, base64, heading, pitch, zoom}]
 let selectedCapture = -1;
